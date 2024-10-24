@@ -1,72 +1,64 @@
 .data
-	matriz: .space 1024
-	n: 	.word 16		# Dimensões da matriz
-	msg: 	.asciiz "\n"        	# Quebra de linha
-	space: 	.asciiz " "
+matriz: .space 1024
+newline: .asciiz "\n"
+
 .text
-main: 
-	la $s0, matriz			# Endereço base da matriz
-	li $s1, 0			# Valor inicial a ser armazenado na matriz (Value)
-	
-	lw $t0, n			# i = 16;
-	
-	li $t3, 0			# Contador de elementos na linha
+main:
+	# --- Inicialização ---
+    	la $s0, matriz        # Carrega o endereço da matriz
+    	li $t4, 4             # Tamanho de uma word 
+    	li $t3, 0             # Inicializa o número a ser armazenado (num)
 
-loop_i:					# loop para linhas
-	beqz $t0, imprimir		# Se i == 0, fim do loop 
-	lw $t1, n			# j = 16;
-	
-loop_j:					# loop para colunas
-	beqz $t1, proxima_linha 	# Se j == 0, proxima linha 
-	
-	# Calcular o endereço da matriz: matriz[i][j]
-	mul $t4, $t3, 4        		# Calcular o deslocamento (t3 * 4 bytes por inteiro)
-    	add $t5, $s0, $t4       	# Calcular o endereço da posição matriz[i][j]
-    	
-    	# Armazenar valor em matriz[i][j]
-    	sw $s1, 0($t5)          	# Armazenar o valor de $s1 no endereço calculado
-    	addi $s1, $s1, 1       	 	# Value++;
-    	
-	addi $t1, $t1, -1		# j--;
-	addi $t3, $t3, 1        	# Incrementar o contador de elementos
-    	j loop_j                 	# Voltar para o loopj
-	
-proxima_linha:
-	addi $t0, $t0, -1		# i--;
-	j loop_i			# Próxima linha
-	
-	
-imprimir:	
-	li $t3, 0			# Contador para impressão
-    	lw $t0, n               	# Carregar o valor de n para o contador de linhas
+    	# --- Loop de Linhas ---
+    	li $t0, 0             # Inicializa I (linha) com 0
+    	j loop_linha
 
-print_loop_i:
-	beqz $t0, fim           	# Se $t0 (i) for 0, fim do loop de impressão
-    	lw $t1, n               	# j = 16;
-    	
-print_loop_j:
-	beqz $t1, print_novalinha
-	mul $t4, $t3, 4			# Calcular deslocamento
-	add $t5, $s0, $t4        	# Calcular o endereço da posição matriz[i][j]
-    	lw $a0, 0($t5)           	# Carregar o valor de matriz[i][j] em $a0
-    	li $v0, 1                	# Chamada de impressão de inteiros
-    	syscall                  	# Imprime o valor
-    	
-    	li $v0, 4                	# Chamada de impressão de string
-    	la $a0, space             	# Endereço da string " "
-    	syscall
+loop_linha:
+    	li $t1, 0             # Inicializa J (coluna) com 0
+    	bge $t0, 16, printar_matriz # Se I >= 16, termina a montagem da matriz
+    	j loop_coluna
 
-    	addi $t1, $t1, -1		# Incrementar o contador de elemento
-    	addi $t3, $t3, 1		# j--;
-    	j print_loop_j            	# Continuar o loop de impressão
+loop_coluna:
+    	bge $t1, 16, fim_linha # Se J >= 16, volta para loop_linha
+    	mul $t2, $t0, 15       # t2 = I * 16 (total de colunas)
+    	add $t2, $t2, $t1      # t2 = t2 + J (endereço linear)
+    	mul $t2, $t2, $t4      # t2 = t2 * 4 (endereço da word)
+    	sw $t3, 0($s0)         # Armazena o número atual na matriz
+    	addi $s0, $s0, 4       # Avança para o próximo endereço na matriz
+    	addi $t1, $t1, 1       # Incrementa J (coluna)
+    	addi $t3, $t3, 1       # Incrementa o número atual
+    	j loop_coluna
 
-print_novalinha:
-    	li $v0, 4                	# Chamada de impressão de string
-    	la $a0, msg              	# Endereço da string de nova linha
-    	syscall                  	# Imprime a nova linha
-    	addi $t0, $t0, -1        	# i--;
-    	j print_loop_i            	# Volta para o loop de impressão de linhas
-    
-fim:
-	li $v0, 10              	# Finaliza o programa
-    	syscall
+fim_linha:
+    	addi $t0, $t0, 1       # Incrementa I (linha)
+    	j loop_linha
+
+printar_matriz:
+    	la $s0, matriz         # Reinicia o endereço da matriz
+    	li $t0, 0              # Inicializa I (linha) com 0
+    	j printar_linha
+
+printar_linha:
+    	li $t1, 0              # Inicializa J (coluna) com 0
+    	bge $t0, 16, encerrar_programa # Se I >= 16, termina o programa
+    	j printar_coluna
+
+printar_coluna:
+    	bge $t1, 16, nova_linha # Se J >= 16, vai para nova_linha
+    	lw $a0, 0($s0)         # Carrega o valor da matriz para $a0
+    	li $v0, 1              # Código para imprimir inteiro
+    	syscall                # Imprime o valor
+    	addi $s0, $s0, 4       # Avança para o próximo endereço na matriz
+    	addi $t1, $t1, 1       # Incrementa J (coluna)
+    	j printar_coluna
+
+nova_linha:
+    	la $a0, newline        # Carrega a nova linha
+    	li $v0, 4              # Código para imprimir string
+    	syscall                # Imprime a nova linha
+    	addi $t0, $t0, 1       # Incrementa I (linha)
+    	j printar_linha
+
+encerrar_programa:
+    	li $v0, 10             # Código para encerrar o programa
+    	syscall                # Executa a syscall para sair
